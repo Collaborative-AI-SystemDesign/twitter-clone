@@ -1,0 +1,86 @@
+# Docker Compose of mysql service for local development
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: sd_db_container
+    ports:
+      - 3306:3306
+    volumes:
+      - ./db:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: sd_root_password
+      MYSQL_DATABASE: sd_db
+      MYSQL_USER: sd_user
+      MYSQL_PASSWORD: sd_password
+
+  mongodb:
+    image: mongo:latest
+    container_name: sd_mongodb_container
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: sd_root
+      MONGO_INITDB_ROOT_PASSWORD: sd_root_password
+    volumes:
+      - mongodb_data:/data/db # 데이터 영속성을 위한 볼륨 마운트
+
+
+  redis:
+    image: redis:latest
+    container_name: sd_redis_container
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis:/data
+      - ./redis/conf/redis.conf:/usr/local/conf/redis.conf
+    command: redis-server /usr/local/conf/redis.conf
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+        - "9000:9000" # API 요청을 보낼 때 쓰는 포트 (AmazonS3Client가 여기에 요청함)
+        - "9001:9001" # 	http://localhost:9001 에서 웹 UI로 버킷 만들거나 파일 업로드 가능
+    volumes:
+      - ./minio/data:/data
+    environment:
+        MINIO_ROOT_USER: sd_admin # AWS S3의 Access Key / Secret Key와 같은 역할
+        MINIO_ROOT_PASSWORD: sd_password
+    command: server /data --console-address ":9001" # 	데이터 저장 경로 설정 및 웹 콘솔 포트 지정
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      #      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - ./prometheus/data:/data
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/data:/data
+    depends_on:
+      - prometheus
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # AMQP 프로토콜 포트
+      - "15672:15672" # 웹 UI 포트 (http://localhost:15672)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+volumes:
+  mysql_data:
+  mongodb_data:
+  redis_data:
