@@ -1,3 +1,4 @@
+#ver 07.15
 # Docker Compose of mysql service for local development
 version: "3.8"
 
@@ -15,16 +16,16 @@ services:
       MYSQL_USER: sd_user
       MYSQL_PASSWORD: sd_password
 
-  mongodb:
-    image: mongo:latest
-    container_name: sd_mongodb_container
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: sd_root
-      MONGO_INITDB_ROOT_PASSWORD: sd_root_password
-    volumes:
-      - mongodb_data:/data/db # 데이터 영속성을 위한 볼륨 마운트
+#  mongodb:
+#    image: mongo:latest
+#    container_name: sd_mongodb_container
+#    ports:
+#      - "27017:27017"
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: sd_root
+#      MONGO_INITDB_ROOT_PASSWORD: sd_root_password
+#    volumes:
+#      - mongodb_data:/data/db # 데이터 영속성을 위한 볼륨 마운트
 
 
   redis:
@@ -37,18 +38,18 @@ services:
       - ./redis/conf/redis.conf:/usr/local/conf/redis.conf
     command: redis-server /usr/local/conf/redis.conf
 
-  minio:
-    image: minio/minio
-    container_name: minio
-    ports:
-        - "9000:9000" # API 요청을 보낼 때 쓰는 포트 (AmazonS3Client가 여기에 요청함)
-        - "9001:9001" # 	http://localhost:9001 에서 웹 UI로 버킷 만들거나 파일 업로드 가능
-    volumes:
-      - ./minio/data:/data
-    environment:
-        MINIO_ROOT_USER: sd_admin # AWS S3의 Access Key / Secret Key와 같은 역할
-        MINIO_ROOT_PASSWORD: sd_password
-    command: server /data --console-address ":9001" # 	데이터 저장 경로 설정 및 웹 콘솔 포트 지정
+#  minio:
+#    image: minio/minio
+#    container_name: minio
+#    ports:
+#        - "9000:9000" # API 요청을 보낼 때 쓰는 포트 (AmazonS3Client가 여기에 요청함)
+#        - "9001:9001" # 	http://localhost:9001 에서 웹 UI로 버킷 만들거나 파일 업로드 가능
+#    volumes:
+#      - ./minio/data:/data
+#    environment:
+#        MINIO_ROOT_USER: sd_admin # AWS S3의 Access Key / Secret Key와 같은 역할
+#        MINIO_ROOT_PASSWORD: sd_password
+#    command: server /data --console-address ":9001" # 	데이터 저장 경로 설정 및 웹 콘솔 포트 지정
 
   prometheus:
     image: prom/prometheus:latest
@@ -80,7 +81,80 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+#  cassandra
+  cassandra-seed:
+    image: cassandra:latest # 특정 버전 (예: cassandra:4.0)을 사용하는 것이 더 안정적입니다.
+    container_name: cassandra-seed
+    hostname: cassandra-seed
+    ports:
+      - "9042:9042" # CQL Native Transport Port (외부 접속용)
+    environment:
+      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-seed # 시드 노드는 자기 자신을 시드로 지정
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      # 아래 메모리 설정은 개발/테스트용이며, 실제 운영 환경에서는 서버 사양에 맞춰 충분히 크게 조정해야 합니다.
+      - HEAP_NEWSIZE=256M
+      - MAX_HEAP_SIZE=1G
+    volumes:
+      - cassandra_seed_data:/var/lib/cassandra # 카산드라 데이터 영구 저장 볼륨
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -u cassandra -p cassandra --debug -e 'DESCRIBE KEYSPACES;' || exit 1" ]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - cassandra_network
+
+  cassandra-node1:
+    image: cassandra:latest
+    container_name: cassandra-node1
+    hostname: cassandra-node1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack2 # 다른 랙으로 설정하여 가용성 증가
+      - CASSANDRA_SEEDS=cassandra-seed # 시드 노드를 지정
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - HEAP_NEWSIZE=256M
+      - MAX_HEAP_SIZE=1G
+    volumes:
+      - cassandra_node1_data:/var/lib/cassandra
+    depends_on:
+      cassandra-seed:
+        condition: service_healthy # 시드 노드가 완전히 준비될 때까지 기다림
+    networks:
+      - cassandra_network
+
+  cassandra-node2:
+    image: cassandra:latest
+    container_name: cassandra-node2
+    hostname: cassandra-node2
+    environment:
+      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack3 # 또 다른 랙으로 설정
+      - CASSANDRA_SEEDS=cassandra-seed
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - HEAP_NEWSIZE=256M
+      - MAX_HEAP_SIZE=1G
+    volumes:
+      - cassandra_node2_data:/var/lib/cassandra
+    depends_on:
+      cassandra-seed:
+        condition: service_healthy
+    networks:
+      - cassandra_network
+
 volumes:
   mysql_data:
-  mongodb_data:
+#  mongodb_data:
   redis_data:
+  cassandra_seed_data:
+  cassandra_node1_data:
+  cassandra_node2_data:
+
+networks:
+  cassandra_network:
+    driver: bridge

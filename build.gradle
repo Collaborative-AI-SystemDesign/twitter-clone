@@ -1,3 +1,4 @@
+//ver 07.15
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.0'
@@ -55,6 +56,8 @@ dependencies {
 	// prometheus
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
+	// cassandra
+	implementation 'org.springframework.boot:spring-boot-starter-data-cassandra'
 
 }
 
