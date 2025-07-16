@@ -16,16 +16,16 @@ services:
       MYSQL_USER: sd_user
       MYSQL_PASSWORD: sd_password
 
-#  mongodb:
-#    image: mongo:latest
-#    container_name: sd_mongodb_container
-#    ports:
-#      - "27017:27017"
-#    environment:
-#      MONGO_INITDB_ROOT_USERNAME: sd_root
-#      MONGO_INITDB_ROOT_PASSWORD: sd_root_password
-#    volumes:
-#      - mongodb_data:/data/db # 데이터 영속성을 위한 볼륨 마운트
+  #  mongodb:
+  #    image: mongo:latest
+  #    container_name: sd_mongodb_container
+  #    ports:
+  #      - "27017:27017"
+  #    environment:
+  #      MONGO_INITDB_ROOT_USERNAME: sd_root
+  #      MONGO_INITDB_ROOT_PASSWORD: sd_root_password
+  #    volumes:
+  #      - mongodb_data:/data/db # 데이터 영속성을 위한 볼륨 마운트
 
 
   redis:
@@ -38,18 +38,18 @@ services:
       - ./redis/conf/redis.conf:/usr/local/conf/redis.conf
     command: redis-server /usr/local/conf/redis.conf
 
-#  minio:
-#    image: minio/minio
-#    container_name: minio
-#    ports:
-#        - "9000:9000" # API 요청을 보낼 때 쓰는 포트 (AmazonS3Client가 여기에 요청함)
-#        - "9001:9001" # 	http://localhost:9001 에서 웹 UI로 버킷 만들거나 파일 업로드 가능
-#    volumes:
-#      - ./minio/data:/data
-#    environment:
-#        MINIO_ROOT_USER: sd_admin # AWS S3의 Access Key / Secret Key와 같은 역할
-#        MINIO_ROOT_PASSWORD: sd_password
-#    command: server /data --console-address ":9001" # 	데이터 저장 경로 설정 및 웹 콘솔 포트 지정
+  #  minio:
+  #    image: minio/minio
+  #    container_name: minio
+  #    ports:
+  #        - "9000:9000" # API 요청을 보낼 때 쓰는 포트 (AmazonS3Client가 여기에 요청함)
+  #        - "9001:9001" # 	http://localhost:9001 에서 웹 UI로 버킷 만들거나 파일 업로드 가능
+  #    volumes:
+  #      - ./minio/data:/data
+  #    environment:
+  #        MINIO_ROOT_USER: sd_admin # AWS S3의 Access Key / Secret Key와 같은 역할
+  #        MINIO_ROOT_PASSWORD: sd_password
+  #    command: server /data --console-address ":9001" # 	데이터 저장 경로 설정 및 웹 콘솔 포트 지정
 
   prometheus:
     image: prom/prometheus:latest
@@ -81,80 +81,115 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
-#  cassandra
-  cassandra-seed:
-    image: cassandra:latest # 특정 버전 (예: cassandra:4.0)을 사용하는 것이 더 안정적입니다.
-    container_name: cassandra-seed
-    hostname: cassandra-seed
+  # Cassandra 클러스터 (3 노드)
+  cassandra-1:
+    image: cassandra:4.0
+    container_name: cassandra-1
+    hostname: cassandra-1
     ports:
-      - "9042:9042" # CQL Native Transport Port (외부 접속용)
+      - "9042:9042" # CQL Native Transport Port for Node 1
     environment:
-      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_CLUSTER_NAME=DevCluster
       - CASSANDRA_DC=datacenter1
       - CASSANDRA_RACK=rack1
-      - CASSANDRA_SEEDS=cassandra-seed # 시드 노드는 자기 자신을 시드로 지정
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
-      # 아래 메모리 설정은 개발/테스트용이며, 실제 운영 환경에서는 서버 사양에 맞춰 충분히 크게 조정해야 합니다.
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-1
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=127.0.0.1
+      - CASSANDRA_START_NATIVE_TRANSPORT=true
+      - CASSANDRA_AUTO_BOOTSTRAP=false
       - HEAP_NEWSIZE=256M
       - MAX_HEAP_SIZE=1G
     volumes:
-      - cassandra_seed_data:/var/lib/cassandra # 카산드라 데이터 영구 저장 볼륨
+      - cassandra_data_1:/var/lib/cassandra
     healthcheck:
       test: [ "CMD-SHELL", "cqlsh -u cassandra -p cassandra --debug -e 'DESCRIBE KEYSPACES;' || exit 1" ]
-      interval: 20s
+      interval: 30s
       timeout: 10s
-      retries: 10
+      retries: 5
+      start_period: 120s
     networks:
       - cassandra_network
 
-  cassandra-node1:
-    image: cassandra:latest
-    container_name: cassandra-node1
-    hostname: cassandra-node1
+  cassandra-2:
+    image: cassandra:4.0
+    container_name: cassandra-2
+    hostname: cassandra-2
+    ports:
+      - "9043:9042" # CQL Native Transport Port for Node 2
     environment:
-      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_CLUSTER_NAME=DevCluster
       - CASSANDRA_DC=datacenter1
-      - CASSANDRA_RACK=rack2 # 다른 랙으로 설정하여 가용성 증가
-      - CASSANDRA_SEEDS=cassandra-seed # 시드 노드를 지정
+      - CASSANDRA_RACK=rack2
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-2
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=127.0.0.1
+      - CASSANDRA_START_NATIVE_TRANSPORT=true
+      - CASSANDRA_AUTO_BOOTSTRAP=false
       - HEAP_NEWSIZE=256M
       - MAX_HEAP_SIZE=1G
     volumes:
-      - cassandra_node1_data:/var/lib/cassandra
+      - cassandra_data_2:/var/lib/cassandra
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -u cassandra -p cassandra --debug -e 'DESCRIBE KEYSPACES;' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     depends_on:
-      cassandra-seed:
-        condition: service_healthy # 시드 노드가 완전히 준비될 때까지 기다림
+      - cassandra-1
     networks:
       - cassandra_network
 
-  cassandra-node2:
-    image: cassandra:latest
-    container_name: cassandra-node2
-    hostname: cassandra-node2
+  cassandra-3:
+    image: cassandra:4.0
+    container_name: cassandra-3
+    hostname: cassandra-3
+    ports:
+      - "9044:9042" # CQL Native Transport Port for Node 3
     environment:
-      - CASSANDRA_CLUSTER_NAME=MyCassandraCluster
+      - CASSANDRA_CLUSTER_NAME=DevCluster
       - CASSANDRA_DC=datacenter1
-      - CASSANDRA_RACK=rack3 # 또 다른 랙으로 설정
-      - CASSANDRA_SEEDS=cassandra-seed
+      - CASSANDRA_RACK=rack3
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-3
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=127.0.0.1
+      - CASSANDRA_START_NATIVE_TRANSPORT=true
+      - CASSANDRA_AUTO_BOOTSTRAP=false
       - HEAP_NEWSIZE=256M
       - MAX_HEAP_SIZE=1G
     volumes:
-      - cassandra_node2_data:/var/lib/cassandra
+      - cassandra_data_3:/var/lib/cassandra
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -u cassandra -p cassandra --debug -e 'DESCRIBE KEYSPACES;' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     depends_on:
-      cassandra-seed:
-        condition: service_healthy
+      - cassandra-1
+      - cassandra-2
     networks:
       - cassandra_network
 
 volumes:
   mysql_data:
-#  mongodb_data:
+  #  mongodb_data:
   redis_data:
-  cassandra_seed_data:
-  cassandra_node1_data:
-  cassandra_node2_data:
+  cassandra_data_1:
+  cassandra_data_2:
+  cassandra_data_3:
 
 networks:
+  default:
+    driver: bridge
   cassandra_network:
     driver: bridge

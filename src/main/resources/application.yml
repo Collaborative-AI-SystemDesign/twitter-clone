@@ -1,3 +1,4 @@
+#ver 07.15
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
@@ -22,7 +23,24 @@ spring:
       host: localhost
       port: 6379
 
-# rabbitmq 설정
+  cassandra:
+    contact-points: ["127.0.0.1:9042", "127.0.0.1:9043", "127.0.0.1:9044"] # 3-node 클러스터 접속점
+    port: 9042 # 기본 포트 (각 노드별 포트는 contact-points에서 지정)
+    local-datacenter: datacenter1
+    keyspace-name: my_test_keyspace
+    username: cassandra # 기본 사용자명
+    password: cassandra # 기본 패스워드
+    session:
+      request:
+        timeout: 30s # 요청 타임아웃
+        consistency: local_quorum # 클러스터에서는 local_quorum 사용
+    connection:
+      connect-timeout: 20s # 연결 타임아웃
+      pool:
+        max-requests-per-connection: 32768
+    schema-action: create-if-not-exists
+
+  # rabbitmq 설정
   rabbitmq:
     host: localhost # RabbitMQ host ip
     port: 5672 # RabbitMQ port
@@ -54,4 +72,6 @@ cloud:
     region:
       static: us-east-1                 # AWS region처럼 지정 (MinIO는 의미 없음)
     stack:
-      auto: false                       # CloudFormation 관련 설정, 꺼도 무방
+      auto: false
+
+  # CloudFormation 관련 설정, 꺼도 무방
