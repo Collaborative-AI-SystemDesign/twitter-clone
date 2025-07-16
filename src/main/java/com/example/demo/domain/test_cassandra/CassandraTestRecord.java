@@ -1,18 +1,18 @@
 package com.example.demo.domain.test_cassandra;
 
-import com.example.demo.domain.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.cassandra.core.mapping.Indexed;
 import org.springframework.data.cassandra.core.mapping.PrimaryKey;
 import org.springframework.data.cassandra.core.mapping.Table;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Table("Cassandra_test_table")
+@Table("cassandra_test_table")
 @Getter
 @Setter
-public class CassandraTestRecord extends BaseEntity {
+public class CassandraTestRecord {
 
     @PrimaryKey
     private UUID id;
@@ -21,6 +21,10 @@ public class CassandraTestRecord extends BaseEntity {
     private String authorName;
     
     private String content;
+    
+    private LocalDateTime createdAt;
+    
+    private LocalDateTime updatedAt;
 
     public CassandraTestRecord() {}
 
@@ -28,5 +32,12 @@ public class CassandraTestRecord extends BaseEntity {
         this.id = id;
         this.authorName = authorName;
         this.content = content;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    public void updateContent(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
     }
 }
