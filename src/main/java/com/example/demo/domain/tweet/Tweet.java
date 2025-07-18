@@ -1,7 +1,6 @@
 package com.example.demo.domain.tweet;
 
-import com.example.demo.domain.BaseEntity;
-import lombok.AllArgsConstructor;
+import com.example.demo.domain.CassandraBaseEntity;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -9,13 +8,14 @@ import org.springframework.data.cassandra.core.mapping.Column;
 import org.springframework.data.cassandra.core.mapping.PrimaryKey;
 import org.springframework.data.cassandra.core.mapping.Table;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Table("tweets")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Tweet extends BaseEntity {
+public class Tweet extends CassandraBaseEntity {
 
     /**
      * 트윗 고유 식별자 (Primary Key)
@@ -47,9 +47,10 @@ public class Tweet extends BaseEntity {
      * @param userId 트윗 작성자 ID
      * @param tweetText 트윗 내용
      */
-    public Tweet(UUID userId, String tweetText) {
+    public Tweet(UUID userId, String tweetText, LocalDateTime createdAt) {
         this.tweetId = UUID.randomUUID(); // 자동으로 고유 ID 생성
         this.userId = userId;
         this.tweetText = tweetText;
+        this.setCreatedAt(createdAt);
     }
 }

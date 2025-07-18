@@ -1,7 +1,6 @@
-// src/main/java/com/example/demo/domain/timeline/UserTimeline.java
 package com.example.demo.domain.timeline;
 
-import com.example.demo.domain.BaseEntity;
+import com.example.demo.domain.CassandraBaseEntity;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,7 +18,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class UserTimeline extends BaseEntity {
+public class UserTimeline extends CassandraBaseEntity {
 
     /**
      * 복합 Primary Key
@@ -52,10 +51,10 @@ public class UserTimeline extends BaseEntity {
      * @param authorId 트윗 작성자 ID
      * @param tweetText 트윗 내용
      */
-    public UserTimeline(UUID followerId, UUID tweetId, UUID authorId, String tweetText) {
-        this.key = new UserTimelineKey(followerId, LocalDateTime.now(), tweetId);
+    public UserTimeline(UUID followerId, UUID tweetId, UUID authorId, String tweetText, LocalDateTime createdAt) {
+        this.key = new UserTimelineKey(followerId, createdAt, tweetId);
         this.authorId = authorId;
         this.tweetText = tweetText;
-        // createdAt, modifiedAt은 BaseEntity에서 자동 관리
+        this.setCreatedAt(createdAt);
     }
 }
