@@ -12,52 +12,54 @@ import java.util.UUID;
 /**
  * Tweet 엔티티를 위한 Cassandra Repository
  * 
- * 주요 기능:
- * - 트윗 원본 저장/조회/삭제
- * - UUID 기반 직접 접근 (O(1) 성능)
- * - 트윗 수정 및 메타데이터 업데이트
+ * API 지원 기능:
+ * - POST /tweets: 트윗 생성
+ * - GET /tweets/{userId}: 사용자별 트윗 조회
  */
 @Repository
 public interface TweetRepository extends CassandraRepository<Tweet, UUID> {
 
     /**
-     * 트윗 ID로 트윗 조회
+     * 트윗 ID로 개별 트윗 조회
      * @param tweetId 트윗 고유 ID
-     * @return 트윗 정보 (Optional)
+     * @return 트윗 정보
      */
     Optional<Tweet> findByTweetId(UUID tweetId);
 
     /**
-     * 특정 사용자가 작성한 트윗 존재 여부 확인
-     * (권한 검증 시 사용)
+     * 특정 사용자의 최신 트윗 조회
+     * GET /tweets/{userId} API 지원
+     * 참고: 성능 최적화를 위해 별도 테이블 설계 권장
+     * @param userId 사용자 ID
+     * @param limit 조회할 트윗 수
+     * @return 사용자의 트윗 목록
+     */
+    @Query("SELECT * FROM tweets WHERE user_id = ?0 ORDER BY created_at DESC LIMIT ?1 ALLOW FILTERING")
+    List<Tweet> findByUserIdOrderByCreatedAtDesc(UUID userId, int limit);
+
+    /**
+     * 커서 기반 사용자 트윗 조회
+     * GET /tweets/{userId}?last={timestamp} API 지원
+     * @param userId 사용자 ID
+     * @param cursor 기준 시간
+     * @param limit 조회할 트윗 수
+     * @return 사용자의 트윗 목록
+     */
+    @Query("SELECT * FROM tweets WHERE user_id = ?0 AND created_at < ?1 ORDER BY created_at DESC LIMIT ?2 ALLOW FILTERING")
+    List<Tweet> findByUserIdAndCreatedAtBefore(UUID userId, LocalDateTime cursor, int limit);
+
+    /**
+     * 트윗 삭제 (작성자 본인만 가능)
+     * @param tweetId 삭제할 트윗 ID
+     */
+    void deleteByTweetId(UUID tweetId);
+
+    /**
+     * 권한 검증용: 특정 사용자가 작성한 트윗인지 확인
      * @param tweetId 트윗 ID
      * @param userId 사용자 ID
      * @return 존재 여부
      */
     @Query("SELECT COUNT(*) FROM tweets WHERE tweet_id = ?0 AND user_id = ?1")
     boolean existsByTweetIdAndUserId(UUID tweetId, UUID userId);
-
-    /**
-     * 여러 트윗을 배치로 조회
-     * (타임라인 상세 정보 조회 시 사용)
-     * @param tweetIds 트윗 ID 목록
-     * @return 트윗 목록
-     */
-    @Query("SELECT * FROM tweets WHERE tweet_id IN ?0")
-    List<Tweet> findByTweetIdIn(List<UUID> tweetIds);
-
-    /**
-     * 트윗 텍스트 업데이트
-     * @param tweetId 트윗 ID
-     * @param tweetText 새로운 트윗 내용
-     * @param modifiedAt 수정 시간
-     */
-    @Query("UPDATE tweets SET tweet_text = ?1, modified_at = ?2 WHERE tweet_id = ?0")
-    void updateTweetText(UUID tweetId, String tweetText, LocalDateTime modifiedAt);
-
-    /**
-     * 트윗 삭제
-     * @param tweetId 삭제할 트윗 ID
-     */
-    void deleteByTweetId(UUID tweetId);
 } 
