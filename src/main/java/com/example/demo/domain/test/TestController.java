@@ -12,7 +12,7 @@ public class TestController {
     private final TestService testService;
 
     @GetMapping("/v1/test/{userId}")
-    public TestEntity request(@PathVariable Long userId) {
+    public TestEntityMySql request(@PathVariable Long userId) {
         return testService.orderItem(userId);
     }
 }

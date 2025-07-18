@@ -1,7 +1,7 @@
-// src/main/java/com/example/demo/domain/celebrity/CelebrityTweet.java
+
 package com.example.demo.domain.celebrity;
 
-import com.example.demo.domain.BaseEntity;
+import com.example.demo.domain.CassandraBaseEntity;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -16,7 +16,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class CelebrityTweet extends BaseEntity {
+public class CelebrityTweet extends CassandraBaseEntity {
 
     /**
      * 복합 Primary Key
@@ -40,9 +40,9 @@ public class CelebrityTweet extends BaseEntity {
      * @param tweetId 트윗 고유 ID (tweets 테이블과 연결)
      * @param tweetText 트윗 내용
      */
-    public CelebrityTweet(UUID authorId, UUID tweetId, String tweetText) {
-        this.key = new CelebrityTweetKey(authorId, LocalDateTime.now(), tweetId);
+    public CelebrityTweet(UUID authorId, UUID tweetId, String tweetText, LocalDateTime createdAt) {
+        this.key = new CelebrityTweetKey(authorId, createdAt, tweetId);
         this.tweetText = tweetText;
-        // createdAt, modifiedAt은 BaseEntity에서 자동 관리
+        this.setCreatedAt(createdAt);
     }
 }

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @MappedSuperclass
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 @EntityListeners(AuditingEntityListener.class)
-public abstract class BaseEntity {
+public abstract class MySqlBaseEntity {
 
     @CreatedDate
     private LocalDateTime createdAt;
