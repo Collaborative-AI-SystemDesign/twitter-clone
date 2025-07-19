@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
 @EnableJpaRepositories(basePackages = "com.example.demo.domain")
-@EnableCassandraRepositories(basePackages = "com.example.demo.domain.test_cassandra")
+@EnableCassandraRepositories(basePackages = "com.example.demo.domain")
 public class RepositoryConfig {
 }
