@@ -8,6 +8,8 @@ import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Table(name = "user")
@@ -16,7 +18,8 @@ import lombok.NoArgsConstructor;
 public class User extends MySqlBaseEntity {
 
   @Id
-  @Column(name = "user_id", columnDefinition = "BINARY(16)")
+  @Column(name = "user_id", columnDefinition = "CHAR(36)")
+  @JdbcTypeCode(SqlTypes.CHAR)
   private UUID userId;
 
   @Column(name = "name", nullable = false)
