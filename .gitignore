@@ -1,0 +1,86 @@
+# Gradle
+.gradle
+/build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+*.iml
+.idea/
+.project
+.classpath
+.settings/
+.vscode/
+
+# Java
+*.class
+
+# Maven (if you ever switch to it)
+target/
+
+# Spring Boot
+/target/
+/classes/
+/generated-snippets/
+/src/main/resources/static/swagger-ui/
+/src/main/resources/static/dist/
+
+# Log files
+*.log
+logs/
+*.json.log
+*.txt.log
+
+# IDE files
+.idea/             # IntelliJ IDEA
+.vscode/           # VS Code
+*.iml              # IntelliJ IDEA
+.project           # Eclipse
+.classpath         # Eclipse
+.settings/         # Eclipse
+.metadata/         # Eclipse workspace
+
+# Operating System Files
+.DS_Store          # macOS
+Thumbs.db          # Windows
+Desktop.ini        # Windows
+
+# dotenv files (environment variables)
+.env
+.env.local
+.env.*.local
+
+# Sensitive configuration files (password, keys, etc.)
+application-local.yml
+application-dev.yml
+application-prod.yml
+application-oauth.yml
+application-secret.yml
+application-*.properties
+application-*.yaml
+*.jks
+*.p12
+*.key
+*.pem
+/src/main/resources/application-*.yml
+/src/main/resources/application-*.properties
+
+# Compiled / packaged files
+*.jar
+*.war
+*.zip
+*.tar.gz
+
+# Node.js (if you have frontend in the same repo)
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnp/
+.pnp.js
+
+# Specific to Spring Boot for MinIO/S3 credentials
+# cloud/aws/credentials/
+# If your credentials are in application.yml directly, ensure it's handled by the sensitive config lines above.
+
+# Local MinIO data (if MinIO is running locally via docker-compose and persists data)
+# Depending on where you map your volumes for MinIO, you might want to ignore those.
+# e.g., if you map to a local folder named 'minio_data'
+# minio_data/
