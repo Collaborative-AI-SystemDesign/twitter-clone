@@ -1,5 +1,7 @@
-package com.example.demo.domain.tweet;
+package com.example.demo.domain.tweet.repository;
 
+import com.example.demo.domain.tweet.TweetByUser;
+import com.example.demo.domain.tweet.TweetByUserKey;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.data.cassandra.repository.Query;
 import org.springframework.stereotype.Repository;

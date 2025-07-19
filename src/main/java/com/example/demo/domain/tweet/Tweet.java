@@ -1,6 +1,7 @@
 package com.example.demo.domain.tweet;
 
 import com.example.demo.domain.CassandraBaseEntity;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -47,8 +48,9 @@ public class Tweet extends CassandraBaseEntity {
      * @param userId 트윗 작성자 ID
      * @param tweetText 트윗 내용
      */
-    public Tweet(UUID userId, String tweetText, LocalDateTime createdAt) {
-        this.tweetId = UUID.randomUUID(); // 자동으로 고유 ID 생성
+    @Builder
+    public Tweet(UUID tweetId, UUID userId, String tweetText, LocalDateTime createdAt) {
+        this.tweetId = tweetId; // 자동으로 고유 ID 생성
         this.userId = userId;
         this.tweetText = tweetText;
         this.setCreatedAt(createdAt);

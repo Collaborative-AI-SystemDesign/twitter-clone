@@ -1,6 +1,7 @@
 package com.example.demo.domain.timeline;
 
 import com.example.demo.domain.CassandraBaseEntity;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -51,6 +52,7 @@ public class UserTimeline extends CassandraBaseEntity {
      * @param authorId 트윗 작성자 ID
      * @param tweetText 트윗 내용
      */
+    @Builder
     public UserTimeline(UUID followerId, UUID tweetId, UUID authorId, String tweetText, LocalDateTime createdAt) {
         this.key = new UserTimelineKey(followerId, createdAt, tweetId);
         this.authorId = authorId;
