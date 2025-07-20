@@ -1,6 +1,6 @@
 package com.example.demo.domain.tweet.response;
 
-import com.example.demo.domain.tweet.Tweet;
+import com.example.demo.domain.tweet.entity.Tweet;
 import lombok.*;
 
 import java.time.LocalDateTime;

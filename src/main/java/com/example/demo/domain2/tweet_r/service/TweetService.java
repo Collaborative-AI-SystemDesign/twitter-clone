@@ -1,16 +1,18 @@
-package com.example.demo.domain.tweet.service;
+package com.example.demo.domain2.tweet_r.service;
 
+import com.example.demo.config.DataSourceConfig;
 import com.example.demo.domain.follow.FollowRepository;
 import com.example.demo.domain.timeline.UserTimeline;
 import com.example.demo.domain.timeline.UserTimelineRepository;
-import com.example.demo.domain.tweet.entity.Tweet;
-import com.example.demo.domain.tweet.entity.TweetByUser;
-import com.example.demo.domain.tweet.repository.TweetByUserRepository;
-import com.example.demo.domain.tweet.repository.TweetRepository;
-import com.example.demo.domain.tweet.request.CreateTweetRequest;
-import com.example.demo.domain.tweet.response.TweetResponse;
-import com.example.demo.domain.tweet.response.TweetListResponse;
-import com.example.demo.domain.tweet.dto.FanoutRetryMessage;
+import com.example.demo.domain2.tweet_r.entity.Tweet;
+import com.example.demo.domain2.tweet_r.entity.TweetByUser;
+import com.example.demo.domain2.tweet_r.entity.TweetByUserKey;
+import com.example.demo.domain2.tweet_r.repository.TweetByUserRepository;
+import com.example.demo.domain2.tweet_r.repository.TweetRepository;
+import com.example.demo.domain2.tweet_r.request.CreateTweetRequest;
+import com.example.demo.domain2.tweet_r.response.TweetResponse;
+import com.example.demo.domain2.tweet_r.response.TweetListResponse;
+import com.example.demo.domain2.tweet_r.dto.FanoutRetryMessage;
 import com.example.demo.rabbitmq.RabbitMqService;
 import com.example.demo.util.UUID.UUIDUtil;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +25,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.example.demo.util.ShardUtil.selectShardKeyByUserId;
+
 /**
- * 트윗 비즈니스 로직 서비스
+ * RDB 버전 트윗 비즈니스 로직 서비스
  * 
  * 핵심 기능:
  * - 트윗 생성 + Fan-out-on-write 전략
@@ -55,6 +59,8 @@ public class TweetService {
         }
         
         UUID tweetId = UUIDUtil.generate();
+        String shardKey = selectShardKeyByUserId(tweetId);
+        DataSourceConfig.setShard(shardKey);
         LocalDateTime now = LocalDateTime.now();
 
         // 1. 원본 트윗 저장 (핵심 데이터, 반드시 성공해야 함)
@@ -67,11 +73,15 @@ public class TweetService {
         tweetRepository.save(tweet);
 
         // 2. 사용자별 트윗 저장 (작성자 본인의 트윗 목록)
-        TweetByUser tweetByUser = TweetByUser.builder()
+        TweetByUserKey key = TweetByUserKey.builder()
                 .userId(userId)
                 .tweetId(tweetId)
-                .tweetText(request.getContent())
                 .createdAt(now)
+                .build();
+        
+        TweetByUser tweetByUser = TweetByUser.builder()
+                .key(key)
+                .tweetText(request.getContent())
                 .build();
         tweetByUserRepository.save(tweetByUser);
 
@@ -190,4 +200,4 @@ public class TweetService {
             
         return new TweetListResponse(tweetResponses, nextCursor, tweets.size() == size);
     }
-}
+} 
