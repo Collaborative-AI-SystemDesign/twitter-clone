@@ -104,7 +104,7 @@ public class DataSourceConfig {
     targetDataSources.put("shard0", shard0DataSource());
     targetDataSources.put("shard1", shard1DataSource());
     targetDataSources.put("shard2", shard2DataSource());
-    targetDataSources.put("shard3", shard0DataSource());
+    targetDataSources.put("shard3", shard3DataSource());
 
     routingDataSource.setTargetDataSources(targetDataSources);
     // 샤드 키가 결정되지 않았을 때 사용할 기본/폴백 DataSource 설정

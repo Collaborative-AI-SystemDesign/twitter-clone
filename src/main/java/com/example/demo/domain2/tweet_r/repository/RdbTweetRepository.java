@@ -10,5 +10,5 @@ import java.util.UUID;
  * RDB 버전 트윗 리포지토리
  */
 @Repository
-public interface TweetRepository extends JpaRepository<Tweet, UUID> {
+public interface RdbTweetRepository extends JpaRepository<Tweet, UUID> {
 } 
