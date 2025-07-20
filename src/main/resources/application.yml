@@ -1,10 +1,23 @@
 #ver 07.15
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
-    username: sd_user
-    password: sd_password
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    shard0:
+      jdbc-url: jdbc:mysql://localhost:3306/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
+      username: sd_user
+      password: sd_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
+
+    shard1:
+      jdbc-url: jdbc:mysql://localhost:3307/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
+      username: sd_user
+      password: sd_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
+
+    shard2:
+      jdbc-url: jdbc:mysql://localhost:3308/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
+      username: sd_user
+      password: sd_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
@@ -13,6 +26,7 @@ spring:
       hibernate:
         format_sql: true
         show_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
     show-sql: true
 
   cache:

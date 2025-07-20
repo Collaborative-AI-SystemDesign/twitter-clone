@@ -25,4 +25,12 @@ public class UserController {
         HttpStatus.CREATED
     );
   }
+
+  @PostMapping("/shard")
+  public ResponseEntity<CreateUserResponse> shardCreateUser(@RequestBody CreatedUserRequest request) {
+    return new ResponseEntity<>(
+        userService.shardCreate(request),
+        HttpStatus.CREATED
+    );
+  }
 }
