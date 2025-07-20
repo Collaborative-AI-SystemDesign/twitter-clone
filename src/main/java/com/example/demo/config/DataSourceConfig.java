@@ -82,6 +82,15 @@ public class DataSourceConfig {
   }
 
   /**
+   * 네 번째 MySQL 샤드(shard2)에 대한 DataSource 빈을 정의합니다.
+   */
+  @Bean
+  @ConfigurationProperties(prefix = "spring.datasource.shard3")
+  public DataSource shard3DataSource() {
+    return DataSourceBuilder.create().type(HikariDataSource.class).build();
+  }
+
+  /**
    * 동적 라우팅을 위한 주(Primary) DataSource 빈을 정의합니다.
    * 이 DataSource를 통해 애플리케이션의 모든 DB 작업이 라우팅됩니다.
    */
@@ -95,6 +104,7 @@ public class DataSourceConfig {
     targetDataSources.put("shard0", shard0DataSource());
     targetDataSources.put("shard1", shard1DataSource());
     targetDataSources.put("shard2", shard2DataSource());
+    targetDataSources.put("shard3", shard0DataSource());
 
     routingDataSource.setTargetDataSources(targetDataSources);
     // 샤드 키가 결정되지 않았을 때 사용할 기본/폴백 DataSource 설정
@@ -117,7 +127,7 @@ public class DataSourceConfig {
       // 샤드 키가 설정되지 않은 경우 (예: 애플리케이션 초기화, JPA DDL 작업 등)
       // 기본 샤드("shard0")를 사용하도록 폴백 (이전에 발생했던 에러 방지)
       System.out.println("No shard key set in ThreadLocal, defaulting to shard0. This might be due to JPA/Hibernate DDL operations or un-sharded queries.");
-      return "shard2";
+      return "shard0";
     }
   }
 }
