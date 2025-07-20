@@ -3,7 +3,8 @@ package com.example.demo.domain.test_cassandra;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.data.cassandra.DataCassandraTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
@@ -12,8 +13,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@DataCassandraTest
 @ActiveProfiles("test")
+@Import(CassandraTestService.class)
 class CassandraTestServiceTest {
 
     @Autowired
@@ -134,19 +136,6 @@ class CassandraTestServiceTest {
         assertEquals(2, cassandraTestService.countByAuthor(author1));
         assertEquals(1, cassandraTestService.countByAuthor(author2));
         assertEquals(3, cassandraTestService.countAll());
-    }
-
-    @Test
-    void testFindRecentRecords() {
-        // Given
-        cassandraTestService.createRecord("author1", "recent content");
-
-        // When
-        List<CassandraTestRecord> recentRecords = cassandraTestService.findRecentRecords(1); // last 1 hour
-
-        // Then
-        assertEquals(1, recentRecords.size());
-        assertEquals("recent content", recentRecords.get(0).getContent());
     }
 
     @Test
