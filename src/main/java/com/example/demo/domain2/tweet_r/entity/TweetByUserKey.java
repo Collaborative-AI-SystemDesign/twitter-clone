@@ -28,7 +28,7 @@ public class TweetByUserKey implements Serializable {
     @Column(name = "tweet_id", columnDefinition = "BINARY(16)")
     private UUID tweetId;
 
-    @Column(name = "created_at")
+    @Column(name = "tweet_created_at")
     private LocalDateTime createdAt;
 
     @Override

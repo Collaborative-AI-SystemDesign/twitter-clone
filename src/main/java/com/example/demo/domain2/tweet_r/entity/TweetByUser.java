@@ -1,6 +1,5 @@
 package com.example.demo.domain2.tweet_r.entity;
 
-import com.example.demo.domain.MySqlBaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,13 +15,13 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "tweets_by_user", indexes = {
-    @Index(name = "idx_tweet_by_user_created", columnList = "userId, createdAt DESC")
+    @Index(name = "idx_tweet_by_user_created", columnList = "user_id, tweet_created_at DESC")
 })
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TweetByUser extends MySqlBaseEntity {
+public class TweetByUser {
 
     @EmbeddedId
     private TweetByUserKey key;

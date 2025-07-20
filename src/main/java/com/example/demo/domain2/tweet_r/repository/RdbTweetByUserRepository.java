@@ -16,7 +16,7 @@ import java.util.UUID;
  * 커서 기반 페이지네이션 지원
  */
 @Repository
-public interface TweetByUserRepository extends JpaRepository<TweetByUser, TweetByUserKey> {
+public interface RdbTweetByUserRepository extends JpaRepository<TweetByUser, TweetByUserKey> {
 
     /**
      * 사용자의 최신 트윗 목록 조회 (첫 페이지)
