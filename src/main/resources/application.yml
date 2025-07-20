@@ -19,6 +19,12 @@ spring:
       password: sd_password
       driver-class-name: com.mysql.cj.jdbc.Driver
 
+    shard3:
+      jdbc-url: jdbc:mysql://localhost:3309/sd_db?serverTimezone=UTC&characterEncoding=UTF-8
+      username: sd_user
+      password: sd_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
