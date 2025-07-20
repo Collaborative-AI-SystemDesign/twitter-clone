@@ -1,4 +1,4 @@
-package com.example.demo.domain.tweet;
+package com.example.demo.domain.tweet.entity;
 
 import com.example.demo.domain.CassandraBaseEntity;
 import lombok.Builder;

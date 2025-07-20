@@ -2,6 +2,8 @@ package com.example.demo.domain.tweet;
 
 import com.example.demo.domain.follow.FollowRepository;
 import com.example.demo.domain.timeline.UserTimelineRepository;
+import com.example.demo.domain.tweet.entity.Tweet;
+import com.example.demo.domain.tweet.entity.TweetByUser;
 import com.example.demo.domain.tweet.repository.TweetByUserRepository;
 import com.example.demo.domain.tweet.repository.TweetRepository;
 import com.example.demo.domain.tweet.request.CreateTweetRequest;

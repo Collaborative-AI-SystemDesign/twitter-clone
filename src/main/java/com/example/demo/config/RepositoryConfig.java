@@ -5,7 +5,7 @@ import org.springframework.data.cassandra.repository.config.EnableCassandraRepos
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
-@EnableJpaRepositories
-@EnableCassandraRepositories
+@EnableJpaRepositories(basePackages = "com.example.demo.domain")
+@EnableCassandraRepositories(basePackages = "com.example.demo.domain")
 public class RepositoryConfig {
 }

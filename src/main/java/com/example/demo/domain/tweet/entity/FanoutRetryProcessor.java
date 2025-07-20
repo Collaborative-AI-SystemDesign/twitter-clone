@@ -1,4 +1,4 @@
-package com.example.demo.domain.tweet;
+package com.example.demo.domain.tweet.entity;
 
 import com.example.demo.domain.tweet.dto.FanoutRetryMessage;
 import com.example.demo.domain.tweet.service.TweetService;
