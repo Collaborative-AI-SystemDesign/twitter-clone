@@ -17,9 +17,25 @@ public class ShardUtil {
    * TweetsByUser, UserTimeline 테이블용
    */
   public static String selectTweetDataShardKeyByUserId(UUID userId) {
-    int shardCount = 3; // shard1, shard2, shard3만 사용
-    int hash = userId.hashCode();
-    int safeHash = (hash == Integer.MIN_VALUE) ? 0 : Math.abs(hash);
+    int shardCount = 3;
+    byte[] uuidBytes = new byte[16];
+    long mostSigBits = userId.getMostSignificantBits();
+    long leastSigBits = userId.getLeastSignificantBits();
+
+    for (int i = 0; i < 8; i++) {
+      uuidBytes[i] = (byte) (mostSigBits >>> (8 * (7 - i)));
+    }
+
+    for (int i = 8; i < 16; i++) {
+      uuidBytes[i] = (byte) (leastSigBits >>> (8 * (15 - i)));
+    }
+
+    int hash = 0;
+    for (int i = 0; i < uuidBytes.length; i++) {
+      hash = hash * 31 + uuidBytes[i];
+    }
+
+    int safeHash = Math.abs(hash);
     int shardNum = (safeHash % shardCount) + 1; // 1, 2, 3
 
     return "shard" + shardNum;
