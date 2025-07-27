@@ -26,10 +26,10 @@ import java.util.UUID;
 public class Tweet extends MySqlBaseEntity {
 
     @Id
-    @Column(name = "tweet_id", columnDefinition = "VARCHAR(36)")
+    @Column(name = "tweet_id", length = 36)
     private UUID tweetId;
 
-    @Column(name = "user_id", nullable = false, columnDefinition = "VARCHAR(36)")
+    @Column(name = "user_id", nullable = false, length = 36)
     private UUID userId;
 
     @Column(name = "tweet_text", nullable = false, length = 280)

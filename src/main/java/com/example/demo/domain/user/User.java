@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
 public class User extends MySqlBaseEntity {
 
   @Id
-  @Column(name = "user_id", columnDefinition = "CHAR(36)")
+  @Column(name = "user_id", columnDefinition = "VARCHAR(36)")
   @JdbcTypeCode(SqlTypes.CHAR)
   private UUID userId;
 

@@ -16,7 +16,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "user_timelines", indexes = {
-    @Index(name = "idx_timeline_follower_created", columnList = "follower_id, tweet_created_at DESC"),
+    @Index(name = "idx_timeline_follower_created", columnList = "follower_id, created_at DESC"),
     @Index(name = "idx_timeline_author", columnList = "author_id"),
     @Index(name = "idx_timeline_tweet", columnList = "tweet_id")
 })
@@ -34,19 +34,19 @@ public class UserTimeline extends MySqlBaseEntity {
     /**
      * 팔로워 ID (타임라인 소유자)
      */
-    @Column(name = "follower_id", nullable = false, columnDefinition = "VARCHAR(36)")
+    @Column(name = "follower_id", nullable = false, length = 36)
     private UUID followerId;
 
     /**
      * 트윗 ID
      */
-    @Column(name = "tweet_id", nullable = false, columnDefinition = "VARCHAR(36)")
+    @Column(name = "tweet_id", nullable = false, length = 36)
     private UUID tweetId;
 
     /**
      * 트윗 작성자 ID
      */
-    @Column(name = "author_id", nullable = false, columnDefinition = "VARCHAR(36)")
+    @Column(name = "author_id", nullable = false, length = 36)
     private UUID authorId;
 
     /**
@@ -56,8 +56,8 @@ public class UserTimeline extends MySqlBaseEntity {
     private String tweetText;
 
     /**
-     * 트윗 생성 시간 (원본 시간) - MySqlBaseEntity의 createdAt과 구분하기 위해 필드명 변경
+     * 트윗 생성 시간 (원본 시간)
      */
-    @Column(name = "tweet_created_at", nullable = false)
-    private LocalDateTime tweetCreatedAt;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 } 

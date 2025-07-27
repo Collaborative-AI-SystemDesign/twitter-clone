@@ -22,10 +22,10 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TweetByUserKey implements Serializable {
 
-    @Column(name = "user_id", columnDefinition = "VARCHAR(36)")
+    @Column(name = "user_id", length = 36)
     private UUID userId;
 
-    @Column(name = "tweet_id", columnDefinition = "VARCHAR(36)")
+    @Column(name = "tweet_id", length = 36)
     private UUID tweetId;
 
     @Column(name = "tweet_created_at")

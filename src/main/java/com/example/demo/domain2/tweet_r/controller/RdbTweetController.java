@@ -2,19 +2,26 @@ package com.example.demo.domain2.tweet_r.controller;
 
 import com.example.demo.common.ApiResponse;
 import com.example.demo.config.DataSourceConfig;
-import com.example.demo.domain2.tweet_r.service.RdbTweetService;
 import com.example.demo.domain2.tweet_r.request.CreateTweetRequest;
-import com.example.demo.domain2.tweet_r.response.TweetResponse;
 import com.example.demo.domain2.tweet_r.response.TweetListResponse;
+import com.example.demo.domain2.tweet_r.response.TweetResponse;
+import com.example.demo.domain2.tweet_r.service.RdbCreateTweetShardService;
+import com.example.demo.domain2.tweet_r.service.RdbTweetService;
 import com.example.demo.util.ShardUtil;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * RDB 버전 트윗 API 컨트롤러
@@ -30,6 +37,7 @@ import java.util.UUID;
 public class RdbTweetController {
 
     private final RdbTweetService tweetService;
+    private final RdbCreateTweetShardService service;
 
     /**
      * 새 트윗 생성
@@ -44,17 +52,18 @@ public class RdbTweetController {
             @Valid @RequestBody CreateTweetRequest createTweetRequest) {
         
         // 컨트롤러 레벨에서 미리 샤드 설정
-        String tweetDataShardKey = ShardUtil.selectTweetDataShardKeyByUserId(userId);
-        log.info("=== 컨트롤러에서 샤드 설정 === userId: {}, 샤드: {}", userId, tweetDataShardKey);
-        DataSourceConfig.setShard(tweetDataShardKey);
+//        String tweetDataShardKey = ShardUtil.selectTweetDataShardKeyByUserId(userId);
+//        log.info("=== 컨트롤러에서 샤드 설정 === userId: {}, 샤드: {}", userId, tweetDataShardKey);
+//        DataSourceConfig.setShard(tweetDataShardKey);
         
         try {
-        TweetResponse response = tweetService.createTweet(userId, createTweetRequest);
-        
-        log.info("RDB 트윗 생성 API 완료 - userId: {}, tweetId: {}", 
+//        TweetResponse response = tweetService.createTweet(userId, createTweetRequest);
+            TweetResponse response = service.createTweetWithCorrectSharding(userId, createTweetRequest);
+
+            log.info("RDB 트윗 생성 API 완료 - userId: {}, tweetId: {}",
                 userId, response.getTweetId());
         
-        return ApiResponse.success("트윗이 성공적으로 생성되었습니다", response);
+            return ApiResponse.success("트윗이 성공적으로 생성되었습니다", response);
         } finally {
             DataSourceConfig.clearShard();
         }

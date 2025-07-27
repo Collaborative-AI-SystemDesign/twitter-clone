@@ -81,7 +81,7 @@ logging:
     com.example.demo.util.cassandra: INFO
     org.springframework.data.cassandra: WARN
     com.datastax.oss.driver: WARN
-    
+
 management:
   endpoints:
     web:
