@@ -1,5 +1,7 @@
 package com.example.demo.domain.tweet.service;
 
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.example.demo.domain.follow.FollowRepository;
 import com.example.demo.domain.follow.FollowersByUser;
 import com.example.demo.domain.timeline.UserTimeline;
@@ -16,40 +18,65 @@ import com.example.demo.rabbitmq.RabbitMqService;
 import com.example.demo.util.UUID.UUIDUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.cassandra.core.CassandraTemplate;
+import org.springframework.data.cassandra.core.cql.WriteOptions;
+import org.springframework.data.cassandra.core.query.Criteria;
+import org.springframework.data.cassandra.core.query.Query;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+
+import static org.springframework.data.cassandra.core.query.Query.query;
+import static org.springframework.data.cassandra.core.query.Criteria.where;
 
 /**
- * 트윗 비즈니스 로직 서비스
+ * 카산드라 최적화된 트윗 서비스
  * 
- * 핵심 기능:
- * - 트윗 생성 + Fan-out-on-write 전략
- * - 사용자별 트윗 조회 (커서 기반 페이지네이션)
- * - 재시도 메커니즘으로 안정성 보장
- * - 300M DAU 대응 성능 최적화
+ * 핵심 최적화:
+ * 1. 배치 처리 (1000개씩 분할)
+ * 2. 비동기 병렬 처리 (CompletableFuture)
+ * 3. ConsistencyLevel ONE 적용
+ * 4. CassandraTemplate batchOps() 사용
+ * 
+ * 예상 성능: 10,000명 팬아웃 16초 → 1-2초
  */
 @Slf4j
-@Service
+@Service("tweetServiceAdvanced")
 @RequiredArgsConstructor
-public class TweetService {
+public class TweetServiceAdvanced {
 
     private final TweetRepository tweetRepository;
     private final TweetByUserRepository tweetByUserRepository;
     private final FollowRepository followRepository;
     private final UserTimelineRepository userTimelineRepository;
     private final RabbitMqService rabbitMqService;
+    private final CassandraTemplate cassandraTemplate;
+    
+    @Qualifier("timelineWriteOptions")
+    private final WriteOptions timelineWriteOptions;
+    
+    @Qualifier("batchWriteOptions")
+    private final WriteOptions batchWriteOptions;
+
+    // 배치 크기 (카산드라 실제 제한 고려: 50-100개가 안전)
+    private static final int BATCH_SIZE = 100;
+    
+    // 고정 ThreadPool로 병렬도 제어 (CPU 코어 수의 2배 권장)
+    private final ExecutorService batchExecutor = Executors.newFixedThreadPool(8);
 
     /**
-     * 새 트윗 생성 + Fan-out-on-write
+     * 새 트윗 생성 + 최적화된 Fan-out-on-write
      * 
-     * 전략: 원본 트윗은 반드시 저장, Fan-out 실패 시에만 큐에서 재시도
+     * @Transactional 제거: Cassandra는 트랜잭션 DB가 아님
      */
-    @Transactional
     public TweetResponse createTweet(UUID userId, CreateTweetRequest request) {
         if (userId == null) {
             throw new IllegalArgumentException("사용자 ID는 필수입니다");
@@ -76,9 +103,9 @@ public class TweetService {
                 .build();
         tweetByUserRepository.save(tweetByUser);
 
-        // 3. Fan-out 시도 (실패해도 트윗 생성은 성공)
+        // 3. 최적화된 Fan-out 시도
         try {
-            fanOutToFollowers(userId, tweetId, request.getContent(), now);
+            optimizedFanOutToFollowers(userId, tweetId, request.getContent(), now);
         } catch (Exception e) {
             log.warn("Fan-out 실패, 재시도 큐로 전송 - userId: {}, tweetId: {}, error: {}", 
                     userId, tweetId, e.getMessage());
@@ -91,9 +118,17 @@ public class TweetService {
     }
 
     /**
-     * 팔로워들의 타임라인에 새 트윗 복사 (Fan-out-on-write)
+     * 🚀 최적화된 팔로워 타임라인 Fan-out
+     * 
+     * 최적화 포인트:
+     * 1. 배치 처리: 1000개씩 분할
+     * 2. 비동기 병렬 처리: CompletableFuture
+     * 3. 진짜 배치 Statement 사용
+     * 4. ConsistencyLevel ONE 적용
      */
-    private void fanOutToFollowers(UUID authorId, UUID tweetId, String tweetText, LocalDateTime createdAt) {
+    private void optimizedFanOutToFollowers(UUID authorId, UUID tweetId, String tweetText, LocalDateTime createdAt) {
+        long startTime = System.currentTimeMillis();
+        
         // 1. 팔로워 목록 조회
         List<UUID> followerIds = followRepository.findByKeyFollowedUserId(authorId)
                 .stream()
@@ -105,27 +140,69 @@ public class TweetService {
             return;
         }
 
-        // 2. Celebrity 사용자 체크 (팔로워 1000명 이상)
-//        if (followerIds.size() > 1000) {
-//            log.info("Celebrity 사용자 Fan-out - authorId: {}, 팔로워 수: {}", authorId, followerIds.size());
-//            // 향후 Hybrid Fan-out 전략 적용 예정
-//        }
+        log.info("최적화된 Fan-out 시작 - authorId: {}, 팔로워 수: {}", authorId, followerIds.size());
 
-        // 3. 각 팔로워의 타임라인에 트윗 추가
+        // 2. UserTimeline 엔티티 생성
         List<UserTimeline> timelineEntries = followerIds.stream()
                 .map(followerId -> UserTimeline.builder()
                         .followerId(followerId)
                         .tweetId(tweetId)
                         .authorId(authorId)
                         .tweetText(tweetText)
-                        .createdAt(createdAt)  // 원본 시간 사용 (중복 방지)
+                        .createdAt(createdAt)
                         .build())
                 .collect(Collectors.toList());
 
-        // 4. 배치 저장 (성능 최적화)
-        userTimelineRepository.saveAll(timelineEntries);
+        // 3. 배치 처리 + 비동기 병렬 실행
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         
-        log.info("Fan-out 완료 - authorId: {}, 팔로워 수: {}", authorId, followerIds.size());
+        for (int i = 0; i < timelineEntries.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, timelineEntries.size());
+            List<UserTimeline> batch = timelineEntries.subList(i, end);
+            int batchNumber = (i / BATCH_SIZE) + 1;
+            
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                processBatch(batch, batchNumber);
+            }, batchExecutor);
+            futures.add(future);
+        }
+        
+        // 4. 모든 배치 완료 대기
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        
+        long endTime = System.currentTimeMillis();
+        long elapsedTime = endTime - startTime;
+        
+        log.info("최적화된 Fan-out 완료 - authorId: {}, 팔로워 수: {}, 소요시간: {}ms, 배치 수: {}", 
+                authorId, followerIds.size(), elapsedTime, futures.size());
+    }
+
+    /**
+     * 개별 배치 처리 (CassandraTemplate.batchOps() 네이티브 배치 사용)
+     * 
+     * 🚀 최적화 포인트:
+     * 1. Spring Data saveAll() → CassandraTemplate.batchOps().insert()
+     * 2. 진짜 Cassandra BatchStatement 생성 (순차 insert X)
+     * 3. ConsistencyLevel ONE 적용으로 빠른 쓰기
+     * 4. 고정 ThreadPool로 병렬도 제어
+     */
+    private void processBatch(List<UserTimeline> batch, int batchNumber) {
+        long batchStartTime = System.currentTimeMillis();
+        
+        try {
+            // 🚀 CassandraTemplate 네이티브 배치 처리
+            cassandraTemplate.batchOps()
+                    .insert(batch, batchWriteOptions)
+                    .execute();
+            
+            long batchEndTime = System.currentTimeMillis();
+            log.debug("🚀 네이티브 배치 #{} 완료 - 크기: {}, 소요시간: {}ms", 
+                    batchNumber, batch.size(), (batchEndTime - batchStartTime));
+                    
+        } catch (Exception e) {
+            log.error("❌ 배치 #{} 실패 - 크기: {}, error: {}", batchNumber, batch.size(), e.getMessage(), e);
+            throw e;
+        }
     }
 
     /**
@@ -135,11 +212,11 @@ public class TweetService {
         log.info("Fan-out 재시도 실행 - authorId: {}, tweetId: {}, retryCount: {}", 
                 message.getAuthorId(), message.getTweetId(), message.getRetryCount());
         
-        fanOutToFollowers(
+        optimizedFanOutToFollowers(
             message.getAuthorId(),
             message.getTweetId(),
             message.getTweetText(),
-            message.getCreatedAt()  // 원본 시간 그대로 사용 (중복 방지)
+            message.getCreatedAt()
         );
     }
 
@@ -160,7 +237,7 @@ public class TweetService {
     }
 
     /**
-     * 사용자의 트윗 목록 조회 (커서 기반 페이지네이션)
+     * 사용자의 트윗 목록 조회 (기존 로직과 동일)
      */
     public TweetListResponse getUserTweets(UUID userId, LocalDateTime lastTimestamp, int size) {
         // 크기 제한 (DoS 방지)

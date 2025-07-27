@@ -27,20 +27,20 @@ import java.util.UUID;
 public class Follow extends MySqlBaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
     /**
      * 팔로우 당하는 사용자 ID (게시물 작성자)
      */
-    @Column(name = "user_id", nullable = false, columnDefinition = "BINARY(16)")
+    @Column(name = "user_id", nullable = false, columnDefinition = "VARCHAR(36)")
     private UUID userId;
 
     /**
      * 팔로우 하는 사용자 ID (팔로워)
      */
-    @Column(name = "follower_id", nullable = false, columnDefinition = "BINARY(16)")
+    @Column(name = "follower_id", nullable = false, columnDefinition = "VARCHAR(36)")
     private UUID followerId;
 
 

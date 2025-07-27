@@ -53,7 +53,7 @@ spring:
     session:
       request:
         timeout: 30s # 요청 타임아웃
-        consistency: local_quorum # 클러스터에서는 local_quorum 사용
+        consistency: one # 성능 최적화: local_quorum → one
     connection:
       connect-timeout: 20s # 연결 타임아웃
       pool:
@@ -75,6 +75,13 @@ rabbitmq:
   routing:
     key: key
 
+logging:
+  level:
+    com.example.demo.logging.logtrace: INFO
+    com.example.demo.util.cassandra: INFO
+    org.springframework.data.cassandra: WARN
+    com.datastax.oss.driver: WARN
+    
 management:
   endpoints:
     web:
