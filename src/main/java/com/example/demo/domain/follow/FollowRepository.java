@@ -15,12 +15,11 @@ import java.util.UUID;
 public interface FollowRepository extends CassandraRepository<FollowersByUser, FollowersByUserKey> {
 
     /**
-     * 특정 사용자의 팔로워 ID 목록 조회 (Fan-out on Write 핵심)
+     * 특정 사용자의 팔로워 목록 조회 (Fan-out on Write 핵심)
      * @param followedUserId 팔로우 당하는 사용자 ID
-     * @return 팔로워 ID 목록
+     * @return 팔로워 목록
      */
-    @Query("SELECT follower_id FROM followers_by_user WHERE followed_user_id = ?0")
-    List<UUID> findFollowerIds(UUID followedUserId);
+    List<FollowersByUser> findByKeyFollowedUserId(UUID followedUserId);
 
     /**
      * 팔로우 관계 존재 여부 확인
