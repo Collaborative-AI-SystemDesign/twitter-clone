@@ -16,7 +16,8 @@ import java.util.Arrays;
 public class LogTraceAspect {
     private final LogTrace trace;
 
-    @Around("execution(* com.example.demo.domain..*(..))")
+    @Around("((execution(* com.example.demo.domain..*(..)) || execution(* com.example.demo.domain2..*(..))) && " +
+            "!within(com.example.demo.domain2.follow_r.entity..*))")
     public Object doTrace(ProceedingJoinPoint joinPoint) throws Throwable {
         String methodName = joinPoint.getSignature().toShortString();
         String args = Arrays.toString(joinPoint.getArgs()); // 파라미터 값 로깅
