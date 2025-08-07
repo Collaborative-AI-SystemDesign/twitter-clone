@@ -28,4 +28,11 @@ public interface FollowRepository extends CassandraRepository<FollowersByUser, F
      * @return 존재 여부
      */
     boolean existsByKeyFollowedUserIdAndKeyFollowerId(UUID followedUserId, UUID followerId);
+
+    /**
+     * 내가 팔로우하는 사람들 조회
+     * @param followerId 팔로우 하는 사용자 ID (나)
+     * @return 나의 팔로잉 목록
+     */
+    List<FollowersByUser> findByKeyFollowerId(UUID followerId);
 } 
