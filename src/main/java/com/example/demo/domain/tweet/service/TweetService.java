@@ -1,7 +1,6 @@
 package com.example.demo.domain.tweet.service;
 
 import com.example.demo.domain.follow.FollowRepository;
-import com.example.demo.domain.follow.FollowersByUser;
 import com.example.demo.domain.timeline.UserTimeline;
 import com.example.demo.domain.timeline.UserTimelineRepository;
 import com.example.demo.domain.tweet.entity.Tweet;
@@ -160,38 +159,94 @@ public class TweetService {
     }
 
     /**
-     * 사용자의 트윗 목록 조회 (커서 기반 페이지네이션)
-     */
-    public TweetListResponse getUserTweets(UUID userId, LocalDateTime lastTimestamp, int size) {
-        // 크기 제한 (DoS 방지)
-        size = Math.min(size, 50);
-        
-        List<TweetByUser> tweets;
-        
-        if (lastTimestamp == null) {
-            tweets = tweetByUserRepository.findLatestTweets(userId)
-                .stream()
-                .limit(size)
-                .collect(Collectors.toList());
-        } else {
-            tweets = tweetByUserRepository.findTweetsWithCursor(userId, lastTimestamp)
-                .stream()
-                .limit(size)
-                .collect(Collectors.toList());
-        }
-        
-        List<TweetResponse> tweetResponses = tweets.stream()
-            .map(tweet -> new TweetResponse(
-                tweet.getKey().getTweetId(),
-                tweet.getKey().getUserId(),
-                tweet.getTweetText(),
-                tweet.getKey().getCreatedAt()
-            ))
+ * 사용자의 트윗 목록 조회 (커서 기반 페이지네이션)
+ */
+public TweetListResponse getUserTweets(UUID userId, LocalDateTime lastTimestamp, int size) {
+    // 크기 제한 (DoS 방지)
+    size = Math.min(size, 50);
+    
+    List<TweetByUser> tweets;
+    
+    if (lastTimestamp == null) {
+        tweets = tweetByUserRepository.findLatestTweets(userId)
+            .stream()
+            .limit(size)
             .collect(Collectors.toList());
-        
-        LocalDateTime nextCursor = tweets.isEmpty() ? null 
-            : tweets.get(tweets.size() - 1).getKey().getCreatedAt();
-            
-        return new TweetListResponse(tweetResponses, nextCursor, tweets.size() == size);
+    } else {
+        tweets = tweetByUserRepository.findTweetsWithCursor(userId, lastTimestamp)
+            .stream()
+            .limit(size)
+            .collect(Collectors.toList());
     }
+    
+    List<TweetResponse> tweetResponses = tweets.stream()
+        .map(tweet -> TweetResponse.builder()
+            .tweetId(tweet.getKey().getTweetId())
+            .userId(tweet.getKey().getUserId())
+            .content(tweet.getTweetText())
+            .createdAt(tweet.getKey().getCreatedAt())
+            .build())
+        .collect(Collectors.toList());
+    
+    LocalDateTime nextCursor = tweets.isEmpty() ? null 
+        : tweets.get(tweets.size() - 1).getKey().getCreatedAt();
+        
+    return new TweetListResponse(tweetResponses, nextCursor, tweets.size() == size);
+}
+
+/**
+ * 🔥 사용자의 타임라인 조회 (Cassandra 직접 조회 버전)
+ * 
+ * 특징:
+ * - Redis SortedSet을 사용하지 않는 버전
+ * - Cassandra UserTimeline 테이블에서 직접 조회
+ * - Fan-out-on-write 전략으로 미리 저장된 데이터 활용
+ * - 커서 기반 페이지네이션 지원
+ * 
+ * @param userId 타임라인을 조회할 사용자 ID
+ * @param lastTimestamp 커서 (이전 페이지의 마지막 시간)
+ * @param size 조회할 트윗 개수 (최대 50개)
+ * @return 타임라인 트윗 목록
+ */
+public TweetListResponse getUserTimeline(UUID userId, LocalDateTime lastTimestamp, int size) {
+    if (userId == null) {
+        throw new IllegalArgumentException("사용자 ID는 필수입니다");
+    }
+    
+    size = Math.min(size, 50);
+    
+    List<UserTimeline> timelineEntries;
+    
+    if (lastTimestamp == null) {
+        // 최신 타임라인 조회
+        timelineEntries = userTimelineRepository.findLatestTimeline(userId)
+                .stream()
+                .limit(size)
+                .collect(Collectors.toList());
+    } else {
+        // 커서 기반 페이지네이션
+        timelineEntries = userTimelineRepository.findTimelineWithCursor(userId, lastTimestamp)
+                .stream()
+                .limit(size)
+                .collect(Collectors.toList());
+    }
+    
+    // UserTimeline → TweetResponse 변환
+    List<TweetResponse> tweetResponses = timelineEntries.stream()
+        .map(timeline -> TweetResponse.builder()
+            .tweetId(timeline.getKey().getTweetId())
+            .userId(timeline.getAuthorId())    // 작성자 ID
+            .content(timeline.getTweetText())
+            .createdAt(timeline.getKey().getCreatedAt())
+            .build())
+        .collect(Collectors.toList());
+    
+    // 다음 커서 설정
+    LocalDateTime nextCursor = timelineEntries.isEmpty() ? null 
+        : timelineEntries.get(timelineEntries.size() - 1).getKey().getCreatedAt();
+    
+    log.info("Cassandra 타임라인 조회 완료 - userId: {}, 조회된 트윗 수: {}", userId, tweetResponses.size());
+    
+    return new TweetListResponse(tweetResponses, nextCursor, timelineEntries.size() == size);
+}
 }

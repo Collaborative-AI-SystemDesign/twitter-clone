@@ -1,6 +1,8 @@
 package com.example.demo.domain.tweet;
 
 import com.example.demo.domain.follow.FollowRepository;
+import com.example.demo.domain.follow.FollowersByUser;
+import com.example.demo.domain.follow.FollowersByUserKey;
 import com.example.demo.domain.timeline.UserTimelineRepository;
 import com.example.demo.domain.tweet.entity.Tweet;
 import com.example.demo.domain.tweet.entity.TweetByUser;
@@ -20,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -78,7 +81,7 @@ class TweetServiceTest {
         
         given(tweetRepository.save(any(Tweet.class))).willReturn(mockTweet);
         given(tweetByUserRepository.save(any(TweetByUser.class))).willReturn(mockTweetByUser);
-        given(followRepository.findFollowerIds(userId)).willReturn(Collections.emptyList());
+        given(followRepository.findByKeyFollowedUserId(userId)).willReturn(Collections.emptyList());
 
         // When
         TweetResponse response = tweetService.createTweet(userId, createRequest);
@@ -89,7 +92,7 @@ class TweetServiceTest {
         
         verify(tweetRepository).save(any(Tweet.class));
         verify(tweetByUserRepository).save(any(TweetByUser.class));
-        verify(followRepository).findFollowerIds(userId);
+        verify(followRepository).findByKeyFollowedUserId(userId);
         verifyNoInteractions(userTimelineRepository);
         verifyNoInteractions(rabbitMqService);
     }
@@ -100,14 +103,11 @@ class TweetServiceTest {
         // Given
         Tweet mockTweet = createMockTweet();
         TweetByUser mockTweetByUser = createMockTweetByUser();
-        List<UUID> followerIds = Arrays.asList(
-            UUID.randomUUID(),
-            UUID.randomUUID()
-        );
+        List<FollowersByUser> followerIds = createMockFollowers(2);
         
         given(tweetRepository.save(any(Tweet.class))).willReturn(mockTweet);
         given(tweetByUserRepository.save(any(TweetByUser.class))).willReturn(mockTweetByUser);
-        given(followRepository.findFollowerIds(userId)).willReturn(followerIds);
+        given(followRepository.findByKeyFollowedUserId(userId)).willReturn(followerIds);
         given(userTimelineRepository.saveAll(anyList())).willReturn(Collections.emptyList());
 
         // When
@@ -118,7 +118,7 @@ class TweetServiceTest {
         
         verify(tweetRepository).save(any(Tweet.class));
         verify(tweetByUserRepository).save(any(TweetByUser.class));
-        verify(followRepository).findFollowerIds(userId);
+        verify(followRepository).findByKeyFollowedUserId(userId);
         verify(userTimelineRepository).saveAll(any());
         verifyNoInteractions(rabbitMqService);
     }
@@ -132,7 +132,7 @@ class TweetServiceTest {
         
         given(tweetRepository.save(any(Tweet.class))).willReturn(mockTweet);
         given(tweetByUserRepository.save(any(TweetByUser.class))).willReturn(mockTweetByUser);
-        given(followRepository.findFollowerIds(userId)).willThrow(new RuntimeException("Database connection failed"));
+        given(followRepository.findByKeyFollowedUserId(userId)).willThrow(new RuntimeException("Database connection failed"));
 
         // When
         TweetResponse response = tweetService.createTweet(userId, createRequest);
@@ -142,7 +142,7 @@ class TweetServiceTest {
         
         verify(tweetRepository).save(any(Tweet.class));
         verify(tweetByUserRepository).save(any(TweetByUser.class));
-        verify(followRepository).findFollowerIds(userId);
+        verify(followRepository).findByKeyFollowedUserId(userId);
         verify(rabbitMqService).sendMessage(any());
         verifyNoInteractions(userTimelineRepository);
     }
@@ -229,5 +229,22 @@ class TweetServiceTest {
                 .tweetText(createRequest.getContent())
                 .createdAt(now)
                 .build();
+    }
+
+    /**
+     * Mock FollowersByUser 리스트 생성
+     */
+    private List<FollowersByUser> createMockFollowers(int count) {
+        List<FollowersByUser> followers = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            FollowersByUserKey key = new FollowersByUserKey();
+            key.setFollowedUserId(userId);
+            key.setFollowerId(UUID.randomUUID());
+            
+            FollowersByUser follower = new FollowersByUser();
+            follower.setKey(key);
+            followers.add(follower);
+        }
+        return followers;
     }
 } 
