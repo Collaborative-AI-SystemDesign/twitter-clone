@@ -1,9 +1,6 @@
 package com.example.demo.domain.tweet.service;
 
-import com.datastax.oss.driver.api.core.cql.BatchStatement;
-import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.example.demo.domain.follow.FollowRepository;
-import com.example.demo.domain.follow.FollowersByUser;
 import com.example.demo.domain.timeline.UserTimeline;
 import com.example.demo.domain.timeline.UserTimelineRepository;
 import com.example.demo.domain.tweet.entity.Tweet;
@@ -21,8 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.cassandra.core.CassandraTemplate;
 import org.springframework.data.cassandra.core.cql.WriteOptions;
-import org.springframework.data.cassandra.core.query.Criteria;
-import org.springframework.data.cassandra.core.query.Query;
+
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -34,8 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 
-import static org.springframework.data.cassandra.core.query.Query.query;
-import static org.springframework.data.cassandra.core.query.Criteria.where;
+
 
 /**
  * 카산드라 최적화된 트윗 서비스
@@ -59,6 +55,7 @@ public class TweetServiceAdvanced {
     private final UserTimelineRepository userTimelineRepository;
     private final RabbitMqService rabbitMqService;
     private final CassandraTemplate cassandraTemplate;
+    private final ZSetOperations<String, Object> zSetOperations;
     
     @Qualifier("timelineWriteOptions")
     private final WriteOptions timelineWriteOptions;
@@ -170,10 +167,19 @@ public class TweetServiceAdvanced {
         // 4. 모든 배치 완료 대기
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         
+        // 5. 🚀 Redis 캐시에도 동시에 업데이트 (각 팔로워의 타임라인 캐시)
+        TweetResponse tweetResponse = TweetResponse.builder()
+                .tweetId(tweetId)
+                .userId(authorId)
+                .content(tweetText)
+                .createdAt(createdAt)
+                .build();
+        updateRedisTimelineCaches(followerIds, tweetResponse);
+        
         long endTime = System.currentTimeMillis();
         long elapsedTime = endTime - startTime;
         
-        log.info("최적화된 Fan-out 완료 - authorId: {}, 팔로워 수: {}, 소요시간: {}ms, 배치 수: {}", 
+        log.info("최적화된 Fan-out + Redis 캐싱 완료 - authorId: {}, 팔로워 수: {}, 소요시간: {}ms, 배치 수: {}", 
                 authorId, followerIds.size(), elapsedTime, futures.size());
     }
 
@@ -258,17 +264,265 @@ public class TweetServiceAdvanced {
         }
         
         List<TweetResponse> tweetResponses = tweets.stream()
-            .map(tweet -> new TweetResponse(
-                tweet.getKey().getTweetId(),
-                tweet.getKey().getUserId(),
-                tweet.getTweetText(),
-                tweet.getKey().getCreatedAt()
-            ))
+            .map(tweet -> TweetResponse.builder()
+                .tweetId(tweet.getKey().getTweetId())
+                .userId(tweet.getKey().getUserId())
+                .content(tweet.getTweetText())
+                .createdAt(tweet.getKey().getCreatedAt())
+                .build())
             .collect(Collectors.toList());
         
         LocalDateTime nextCursor = tweets.isEmpty() ? null 
             : tweets.get(tweets.size() - 1).getKey().getCreatedAt();
             
         return new TweetListResponse(tweetResponses, nextCursor, tweets.size() == size);
+    }
+
+    /**
+     * 🚀 사용자의 타임라인 조회 (Redis SortedSet 최적화 버전)
+     * 
+     * 핵심 최적화:
+     * 1. Redis SortedSet 활용: O(log N) 성능으로 빠른 조회
+     * 2. Score 기반 시간 정렬: timestamp를 score로 사용
+     * 3. 캐시 미스 시 Cassandra 폴백: 안정성 보장
+     * 4. TTL 관리: 메모리 효율성
+     * 
+     * Redis Key 구조: "timeline:user:{userId}"
+     * SortedSet Score: 트윗 생성시간의 timestamp (milliseconds)
+     * SortedSet Value: 트윗 정보 JSON
+     * 
+     * @param userId 타임라인을 조회할 사용자 ID
+     * @param lastTimestamp 커서 (이전 페이지의 마지막 시간)
+     * @param size 조회할 트윗 개수 (최대 50개)
+     * @return 타임라인 트윗 목록
+     */
+    public TweetListResponse getUserTimelineOptimized(UUID userId, LocalDateTime lastTimestamp, int size) {
+        if (userId == null) {
+            throw new IllegalArgumentException("사용자 ID는 필수입니다");
+        }
+        
+        size = Math.min(size, 50);
+        
+        String redisKey = "timeline:user:" + userId.toString();
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            // 1. Redis SortedSet에서 타임라인 조회
+            List<TweetResponse> tweetResponses = getTimelineFromRedis(redisKey, lastTimestamp, size);
+            
+            if (!tweetResponses.isEmpty()) {
+                long endTime = System.currentTimeMillis();
+                log.info("🚀 Redis 타임라인 조회 성공 - userId: {}, 조회된 트윗 수: {}, 소요시간: {}ms", 
+                        userId, tweetResponses.size(), (endTime - startTime));
+                
+                LocalDateTime nextCursor = tweetResponses.isEmpty() ? null 
+                    : tweetResponses.get(tweetResponses.size() - 1).getCreatedAt();
+                
+                return new TweetListResponse(tweetResponses, nextCursor, tweetResponses.size() == size);
+            }
+            
+            // 2. Redis 캐시 미스 - Cassandra에서 조회 후 Redis에 캐싱
+            log.info("Redis 캐시 미스 - Cassandra 폴백 실행: userId={}", userId);
+            return getUserTimelineFromCassandraAndCache(userId, lastTimestamp, size, redisKey);
+            
+        } catch (Exception e) {
+            log.warn("Redis 타임라인 조회 실패 - Cassandra 폴백: userId={}, error={}", userId, e.getMessage());
+            return getUserTimelineFromCassandraAndCache(userId, lastTimestamp, size, redisKey);
+        }
+    }
+
+    /**
+     * Redis SortedSet에서 타임라인 조회
+     */
+    private List<TweetResponse> getTimelineFromRedis(String redisKey, LocalDateTime lastTimestamp, int size) {
+        try {
+            // SortedSet에서 최신순으로 조회 (ZREVRANGEBYSCORE)
+            double maxScore = lastTimestamp != null 
+                ? lastTimestamp.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                : System.currentTimeMillis();
+                
+            // Redis SortedSet: 높은 score부터 조회 (최신순)
+            java.util.Set<Object> rawResults = zSetOperations.reverseRangeByScore(
+                redisKey, 
+                0, 
+                lastTimestamp != null ? maxScore - 1 : maxScore, // 커서 다음부터
+                0, 
+                size
+            );
+            
+            if (rawResults == null || rawResults.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // JSON → TweetResponse 변환
+            return rawResults.stream()
+                .map(this::convertToTweetResponse)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+                
+        } catch (Exception e) {
+            log.error("Redis SortedSet 조회 실패: key={}, error={}", redisKey, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Cassandra에서 타임라인 조회 후 Redis에 캐싱
+     */
+    private TweetListResponse getUserTimelineFromCassandraAndCache(UUID userId, LocalDateTime lastTimestamp, int size, String redisKey) {
+        long startTime = System.currentTimeMillis();
+        
+        // Cassandra에서 조회
+        List<UserTimeline> timelineEntries;
+        
+        if (lastTimestamp == null) {
+            timelineEntries = userTimelineRepository.findLatestTimeline(userId)
+                    .stream()
+                    .limit(size)
+                    .collect(Collectors.toList());
+        } else {
+            timelineEntries = userTimelineRepository.findTimelineWithCursor(userId, lastTimestamp)
+                    .stream()
+                    .limit(size)
+                    .collect(Collectors.toList());
+        }
+        
+        // UserTimeline → TweetResponse 변환
+        List<TweetResponse> tweetResponses = timelineEntries.stream()
+            .map(timeline -> TweetResponse.builder()
+                .tweetId(timeline.getKey().getTweetId())
+                .userId(timeline.getAuthorId())
+                .content(timeline.getTweetText())
+                .createdAt(timeline.getKey().getCreatedAt())
+                .build())
+            .collect(Collectors.toList());
+        
+        // Redis에 캐싱 (비동기)
+        CompletableFuture.runAsync(() -> {
+            cacheTimelineToRedis(redisKey, tweetResponses);
+        }, batchExecutor);
+        
+        LocalDateTime nextCursor = timelineEntries.isEmpty() ? null 
+            : timelineEntries.get(timelineEntries.size() - 1).getKey().getCreatedAt();
+        
+        long endTime = System.currentTimeMillis();
+        log.info("Cassandra 타임라인 조회 + Redis 캐싱 완료 - userId: {}, 조회된 트윗 수: {}, 소요시간: {}ms", 
+                userId, tweetResponses.size(), (endTime - startTime));
+        
+        return new TweetListResponse(tweetResponses, nextCursor, timelineEntries.size() == size);
+    }
+
+    /**
+     * Redis SortedSet에 타임라인 캐싱
+     */
+    private void cacheTimelineToRedis(String redisKey, List<TweetResponse> tweets) {
+        try {
+            if (tweets.isEmpty()) {
+                return;
+            }
+            
+            // SortedSet에 트윗들 추가
+            for (TweetResponse tweet : tweets) {
+                double score = tweet.getCreatedAt()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
+                    
+                zSetOperations.add(redisKey, tweet, score);
+            }
+            
+            // TTL 설정: 1시간 (타임라인은 자주 변경되므로 짧게)
+            zSetOperations.getOperations().expire(redisKey, java.time.Duration.ofHours(1));
+            
+            log.debug("Redis 타임라인 캐싱 완료: key={}, 트윗 수={}", redisKey, tweets.size());
+            
+        } catch (Exception e) {
+            log.error("Redis 타임라인 캐싱 실패: key={}, error={}", redisKey, e.getMessage());
+        }
+    }
+
+    /**
+     * 🚀 Fan-out 시 각 팔로워의 Redis 타임라인 캐시 동시 업데이트
+     * 
+     * 새로운 트윗이 Fan-out될 때 각 팔로워의 Redis 캐시에도 추가
+     * - 각 팔로워의 타임라인 캐시 키: "timeline:user:{followerId}"
+     * - SortedSet에 새 트윗 추가 (Score: timestamp)
+     * - 비동기 처리로 Fan-out 성능에 영향 최소화
+     */
+    private void updateRedisTimelineCaches(List<UUID> followerIds, TweetResponse newTweet) {
+        CompletableFuture.runAsync(() -> {
+            long startTime = System.currentTimeMillis();
+            double score = newTweet.getCreatedAt()
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli();
+            
+            int successCount = 0;
+            for (UUID followerId : followerIds) {
+                try {
+                    String redisKey = "timeline:user:" + followerId.toString();
+                    
+                    // SortedSet에 새 트윗 추가
+                    zSetOperations.add(redisKey, newTweet, score);
+                    
+                    // TTL 갱신 (1시간)
+                    zSetOperations.getOperations().expire(redisKey, java.time.Duration.ofHours(1));
+                    
+                    successCount++;
+                    
+                } catch (Exception e) {
+                    log.warn("팔로워 {} Redis 캐시 업데이트 실패: {}", followerId, e.getMessage());
+                }
+            }
+            
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("🚀 Redis 타임라인 캐시 Fan-out 완료 - 대상: {}명, 성공: {}명, 소요시간: {}ms", 
+                    followerIds.size(), successCount, elapsedTime);
+                    
+        }, batchExecutor).exceptionally(throwable -> {
+            log.error("Redis 타임라인 캐시 Fan-out 실패", throwable);
+            return null;
+        });
+    }
+
+    /**
+     * Object → TweetResponse 변환
+     */
+    private TweetResponse convertToTweetResponse(Object obj) {
+        try {
+            if (obj instanceof TweetResponse) {
+                return (TweetResponse) obj;
+            }
+            if (obj instanceof java.util.Map<?, ?> mapObj) {
+                Object tweetIdObj = mapObj.get("tweetId");
+                Object userIdObj = mapObj.get("userId");
+                Object contentObj = mapObj.get("content");
+                Object createdAtObj = mapObj.get("createdAt");
+
+                java.util.UUID tweetId = tweetIdObj != null ? java.util.UUID.fromString(tweetIdObj.toString()) : null;
+                java.util.UUID userId = userIdObj != null ? java.util.UUID.fromString(userIdObj.toString()) : null;
+                java.time.LocalDateTime createdAt;
+                if (createdAtObj instanceof java.time.LocalDateTime ldt) {
+                    createdAt = ldt;
+                } else if (createdAtObj != null) {
+                    createdAt = java.time.LocalDateTime.parse(createdAtObj.toString());
+                } else {
+                    createdAt = null;
+                }
+
+                return TweetResponse.builder()
+                        .tweetId(tweetId)
+                        .userId(userId)
+                        .content(contentObj != null ? contentObj.toString() : null)
+                        .createdAt(createdAt)
+                        .build();
+            }
+
+            log.warn("Redis에서 예상치 못한 객체 타입: {}", obj.getClass());
+            return null;
+        } catch (Exception e) {
+            log.error("TweetResponse 변환 실패: {}", e.getMessage());
+            return null;
+        }
     }
 }
