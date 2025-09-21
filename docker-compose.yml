@@ -3,60 +3,60 @@
 version: "3.8"
 
 services:
-#  mysql0:
-#    image: mysql:8.0
-#    container_name: mysql0
-#    ports:
-#      - "3306:3306"
-#    volumes:
-#      - ./db:/var/lib/mysql
-#    environment:
-#      MYSQL_ROOT_PASSWORD: sd_root_password
-#      MYSQL_DATABASE: sd_db
-#      MYSQL_USER: sd_user
-#      MYSQL_PASSWORD: sd_password
-#
-#  mysql1:
-#    image: mysql:8.0
-#    container_name: mysql1
-#    environment:
-#      MYSQL_ROOT_PASSWORD: sd_root_password
-#      MYSQL_DATABASE: sd_db
-#      MYSQL_USER: sd_user
-#      MYSQL_PASSWORD: sd_password
-#    ports:
-#      - "3307:3306"
-#    volumes:
-#      - shard1_data:/var/lib/mysql
-#      - ./mysql_init/shard1.sql:/docker-entrypoint-initdb.d/init.sql:ro
-#
-#  mysql2:
-#    image: mysql:8.0
-#    container_name: mysql2
-#    environment:
-#      MYSQL_ROOT_PASSWORD: sd_root_password
-#      MYSQL_DATABASE: sd_db
-#      MYSQL_USER: sd_user
-#      MYSQL_PASSWORD: sd_password
-#    ports:
-#      - "3308:3306"
-#    volumes:
-#      - shard2_data:/var/lib/mysql
-#      - ./mysql_init/shard2.sql:/docker-entrypoint-initdb.d/init.sql:ro
-#
-#  mysql3:
-#    image: mysql:8.0
-#    container_name: mysql3
-#    environment:
-#      MYSQL_ROOT_PASSWORD: sd_root_password
-#      MYSQL_DATABASE: sd_db
-#      MYSQL_USER: sd_user
-#      MYSQL_PASSWORD: sd_password
-#    ports:
-#      - "3309:3306"
-#    volumes:
-#      - shard3_data:/var/lib/mysql
-#      - ./mysql_init/shard3.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  mysql0:
+    image: mysql:8.0
+    container_name: mysql0
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: sd_root_password
+      MYSQL_DATABASE: sd_db
+      MYSQL_USER: sd_user
+      MYSQL_PASSWORD: sd_password
+
+  mysql1:
+    image: mysql:8.0
+    container_name: mysql1
+    environment:
+      MYSQL_ROOT_PASSWORD: sd_root_password
+      MYSQL_DATABASE: sd_db
+      MYSQL_USER: sd_user
+      MYSQL_PASSWORD: sd_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - shard1_data:/var/lib/mysql
+      - ./mysql_init/shard1.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  mysql2:
+    image: mysql:8.0
+    container_name: mysql2
+    environment:
+      MYSQL_ROOT_PASSWORD: sd_root_password
+      MYSQL_DATABASE: sd_db
+      MYSQL_USER: sd_user
+      MYSQL_PASSWORD: sd_password
+    ports:
+      - "3308:3306"
+    volumes:
+      - shard2_data:/var/lib/mysql
+      - ./mysql_init/shard2.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  mysql3:
+    image: mysql:8.0
+    container_name: mysql3
+    environment:
+      MYSQL_ROOT_PASSWORD: sd_root_password
+      MYSQL_DATABASE: sd_db
+      MYSQL_USER: sd_user
+      MYSQL_PASSWORD: sd_password
+    ports:
+      - "3309:3306"
+    volumes:
+      - shard3_data:/var/lib/mysql
+      - ./mysql_init/shard3.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   #  mongodb:
   #    image: mongo:latest
