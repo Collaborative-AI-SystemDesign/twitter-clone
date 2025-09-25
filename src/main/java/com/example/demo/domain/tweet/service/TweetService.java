@@ -1,7 +1,6 @@
 package com.example.demo.domain.tweet.service;
 
 import com.example.demo.domain.follow.FollowRepository;
-import com.example.demo.domain.follow.FollowersByUser;
 import com.example.demo.domain.timeline.UserTimeline;
 import com.example.demo.domain.timeline.UserTimelineRepository;
 import com.example.demo.domain.tweet.entity.Tweet;

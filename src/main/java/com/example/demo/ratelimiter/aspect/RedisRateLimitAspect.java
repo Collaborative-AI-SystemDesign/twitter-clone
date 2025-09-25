@@ -3,7 +3,7 @@ package com.example.demo.ratelimiter.aspect;
 import com.example.demo.ratelimiter.annotation.RedisRateLimit;
 import com.example.demo.ratelimiter.common.RateLimitConfig;
 import com.example.demo.ratelimiter.common.RateLimitResult;
-import com.example.demo.ratelimiter.common.RateLimiter;
+import com.example.demo.ratelimiter.common.RedisRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -45,7 +45,7 @@ public class RedisRateLimitAspect {
         String key = generateKey(redisRateLimit);
         
         // 해당 Redis 알고리즘의 Rate Limiter 선택
-        RateLimiter limiter = getRedisRateLimiter(redisRateLimit.algorithm());
+        RedisRateLimiter limiter = getRedisRateLimiter(redisRateLimit.algorithm());
         
         // 설정에 따른 Rate Limiter 구성
         RateLimitResult result;
@@ -144,12 +144,12 @@ public class RedisRateLimitAspect {
     /**
      * Redis 알고리즘에 해당하는 Rate Limiter 빈 조회
      */
-    private RateLimiter getRedisRateLimiter(RedisRateLimit.RedisAlgorithmType algorithm) {
+    private RedisRateLimiter getRedisRateLimiter(RedisRateLimit.RedisAlgorithmType algorithm) {
         try {
-            return applicationContext.getBean(algorithm.getBeanName(), RateLimiter.class);
+            return applicationContext.getBean(algorithm.getBeanName(), RedisRateLimiter.class);
         } catch (Exception e) {
             // 기본값으로 Redis Token Bucket 사용
-            return applicationContext.getBean("redisTokenBucketLimiter", RateLimiter.class);
+            return applicationContext.getBean("redisTokenBucketLimiter", RedisRateLimiter.class);
         }
     }
     
@@ -184,7 +184,7 @@ public class RedisRateLimitAspect {
      * 커스텀 설정으로 Rate Limiter 호출
      * 리플렉션을 사용하여 설정을 전달
      */
-    private RateLimitResult tryAcquireWithConfig(RateLimiter limiter, String key, RateLimitConfig config) {
+    private RateLimitResult tryAcquireWithConfig(RedisRateLimiter limiter, String key, RateLimitConfig config) {
         try {
             // tryAcquire(String key, RateLimitConfig config) 메서드가 있는지 확인
             Method method = limiter.getClass().getMethod("tryAcquire", String.class, RateLimitConfig.class);
